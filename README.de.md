@@ -50,13 +50,13 @@ Danach als root auf dem PiKVM (mit den Zugangsdaten des PiKVM):
 bash server/setup-pikvm.sh
 ```
 
-Das Skript prüft, ob es auf einem PiKVM läuft, schaltet das Root-Dateisystem auf schreibbar (`rw`), installiert iperf3, legt den Dienst `lantester-iperf3` an, fügt ein systemd-networkd-Drop-in `/etc/systemd/network/eth0.network.d/lantester.conf` mit `Address=169.254.99.1/16` hinzu (die `eth0.network` des Pakets bleibt unangetastet) und schaltet am Ende wieder auf schreibgeschützt (`ro`), auch nach einem Fehler. Die Adresse kommt zusätzlich zu einer per DHCP erhaltenen. Ein Neustart ist nicht nötig.
+Das Skript prüft, ob es auf einem PiKVM läuft, schaltet das Root-Dateisystem auf schreibbar (`rw`), installiert iperf3, legt den Dienst `lantester-iperf3` an, fügt ein systemd-networkd-Drop-in `/etc/systemd/network/eth0.network.d/lantester.conf` mit `Address=169.254.99.1/16` hinzu (die `eth0.network` des Pakets bleibt unangetastet) aktiviert `avahi-daemon` (beim PiKVM vorhanden, aber abgeschaltet), damit der PiKVM unter `<hostname>.local` antwortet (standardmäßig `pikvm.local`), und schaltet am Ende wieder auf schreibgeschützt (`ro`), auch nach einem Fehler. Die Adresse kommt zusätzlich zu einer per DHCP erhaltenen. Ein Neustart ist nicht nötig.
 
 ## Messen
 
 Die Client-Skripte messen je 10 Sekunden in jede Richtung und geben den Empfänger-Wert aus. Vorher iperf3 auf dem Notebook besorgen:
 
-- Windows: ein Build wie https://github.com/ar51an/iperf3-win-builds/releases (entpacken, `client/lantest.cmd` in denselben Ordner wie `iperf3.exe` legen).
+- Windows: ein Build wie https://github.com/ar51an/iperf3-win-builds/releases (entpacken, `client/lantest.cmd` und `client/lantest-find.ps1` in denselben Ordner wie `iperf3.exe` legen).
 - macOS: `brew install iperf3`.
 - Linux: `apt install iperf3` bzw. das Äquivalent der Distribution.
 
@@ -68,24 +68,43 @@ Die Client-Skripte messen je 10 Sekunden in jede Richtung und geben den Empfäng
 
 ### Über Switches (normales Netz)
 
-Den Pi an die Dose oder den Switch stecken, das Notebook ist wie gewohnt im Netz. Dem Skript die DHCP-Adresse des Pi mitgeben (aus der Lease-Liste des Routers, oder `iperf-peer.local`). `169.254.99.1` funktioniert nur, wenn das Notebook zusätzlich eine direkte `169.254`-Route hat, was in einem gerouteten Netz meist nicht der Fall ist.
+Den Pi an die Dose oder den Switch stecken, das Notebook ist wie gewohnt im Netz. Das Client-Skript ohne Argument starten; es findet den Pi über seinen Namen oder einen Netzwerk-Scan (siehe unten). Klappt das nicht, die DHCP-Adresse des Pi aus der Geräteliste des Routers mitgeben.
+
+### So wird die Gegenstelle gefunden
+
+Ohne Argument probieren beide Client-Skripte in dieser Reihenfolge und nehmen die erste Gegenstelle, die auf Port 5201 antwortet (etwa 2 s pro Versuch):
+
+1. `169.254.99.1` (Direktkabel; unter macOS oft auch im normalen Netz, siehe unten).
+2. `iperf-peer.local` (der Standard-Hostname aus `setup-raspberry-pi-os.sh`).
+3. `pikvm.local` (der Standard-Hostname eines PiKVM).
+4. Ein Scan des Netzes des Notebooks, nur wenn es ein `/24` oder kleiner ist: ein schneller Ping-Durchlauf, danach wird jeder Raspberry Pi in der ARP-Tabelle (erkannt am Anfang der MAC-Adresse) auf Port 5201 geprüft.
+
+Das Skript zeigt an, welche Gegenstelle es verwendet (`Peer found: ...`). Antwortet keine, listet es auf, was probiert wurde, und endet mit einem Fehlercode ungleich 0. Mit einem Argument entfällt die Suche.
+
+Grenzen:
+
+- Ein umbenannter Pi oder PiKVM wird nicht über den Namen gefunden. Dann seinen Namen (`meinpi.local`) oder seine IP mitgeben, oder auf den Scan setzen.
+- Netze, die mDNS (`.local`-Namen) sperren oder Geräte voneinander abschotten (Gäste-WLAN, manche Firmennetze), verhindern Namen und Scan. Dann die IP mitgeben.
+- Der Scan pingt jede Adresse im Netz an. Sicherheitssoftware in einem verwalteten Netz kann das bemerken oder melden.
+- Hängt die Gegenstelle zusätzlich im WLAN, findet der Scan womöglich deren WLAN-Adresse und misst dann die Funkstrecke. Das WLAN der Gegenstelle abschalten oder ihre kabelgebundene IP mitgeben.
+- `LANTEST_PEERS="name-oder-ip ..."` ersetzt die Liste der Namen, die vor dem Scan probiert werden.
 
 ### Windows
 
 `client/lantest.cmd` doppelklicken oder in einer Eingabeaufforderung starten:
 
 ```
-lantest.cmd                  rem Direktkabel, Ziel 169.254.99.1
-lantest.cmd 192.168.1.50     rem Pi im normalen Netz
+lantest.cmd                  rem Gegenstelle automatisch finden
+lantest.cmd 192.168.1.50     rem diese Gegenstelle verwenden
 ```
 
-`iperf3.exe` muss im selben Ordner liegen. Das Skript zeigt auch die Link-Geschwindigkeiten des Notebooks an.
+`iperf3.exe` und `lantest-find.ps1` müssen im selben Ordner liegen; die beiden Skripte immer zusammen weitergeben. Das Skript zeigt auch die Link-Geschwindigkeiten des Notebooks an.
 
 ### macOS und Linux
 
 ```
-client/lantest.sh                  # Ziel 169.254.99.1
-client/lantest.sh 192.168.1.50     # Pi im normalen Netz
+client/lantest.sh                  # Gegenstelle automatisch finden
+client/lantest.sh 192.168.1.50     # diese Gegenstelle verwenden
 ```
 
 Es zeigt, über welche Schnittstelle das Ziel erreicht wird, warnt bei WLAN, zeigt die Link-Geschwindigkeit der Schnittstelle, misst beide Richtungen und gibt ein Urteil in einer Zeile aus. Ist der Pi nicht erreichbar, endet es mit einem Fehlercode ungleich 0 und einem Hinweis. Es läuft mit der bash 3.2, die macOS mitbringt.

@@ -4,6 +4,7 @@
 #
 #   - installs iperf3 and runs "iperf3 --server" at boot (port 5201)
 #   - adds the fixed address 169.254.99.1/16 to eth0 next to whatever DHCP gives
+#   - enables avahi, so the PiKVM answers as <hostname>.local (default pikvm.local)
 #   - never serves DHCP, so it is safe on someone else's network
 #
 # Run as root on the PiKVM. Idempotent: running it again changes nothing.
@@ -72,6 +73,12 @@ if ! cmp -s "$tmp" "$DROPIN"; then
 fi
 rm -f "$tmp"
 networkctl reload
+
+echo "== Announce the hostname via mDNS (avahi)"
+# PiKVM ships avahi but leaves it disabled. With it running, the PiKVM answers
+# as <hostname>.local (pikvm.local by default), which the client scripts try.
+pacman -S --noconfirm --needed avahi
+systemctl enable --now avahi-daemon.service
 
 echo
 echo "Done. Verify:"

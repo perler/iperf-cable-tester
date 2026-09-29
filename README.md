@@ -50,13 +50,13 @@ Then, as root on the PiKVM (use your PiKVM credentials):
 bash server/setup-pikvm.sh
 ```
 
-The script checks that it is running on a PiKVM, switches the root filesystem to writable (`rw`), installs iperf3, installs the `lantester-iperf3` service, adds a systemd-networkd drop-in `/etc/systemd/network/eth0.network.d/lantester.conf` with `Address=169.254.99.1/16` (the package's own `eth0.network` stays untouched), and switches back to read-only (`ro`) on exit, even after an error. The address is added next to whatever DHCP provides. No reboot needed.
+The script checks that it is running on a PiKVM, switches the root filesystem to writable (`rw`), installs iperf3, installs the `lantester-iperf3` service, adds a systemd-networkd drop-in `/etc/systemd/network/eth0.network.d/lantester.conf` with `Address=169.254.99.1/16` (the package's own `eth0.network` stays untouched), enables `avahi-daemon` (PiKVM ships it disabled) so the PiKVM answers as `<hostname>.local` (`pikvm.local` by default), and switches back to read-only (`ro`) on exit, even after an error. The address is added next to whatever DHCP provides. No reboot needed.
 
 ## Measuring
 
 The client scripts run 10 seconds in each direction and print the receiver figure. Get iperf3 for the laptop first:
 
-- Windows: a build such as https://github.com/ar51an/iperf3-win-builds/releases (unzip, put `client/lantest.cmd` in the same folder as `iperf3.exe`).
+- Windows: a build such as https://github.com/ar51an/iperf3-win-builds/releases (unzip, put `client/lantest.cmd` and `client/lantest-find.ps1` in the same folder as `iperf3.exe`).
 - macOS: `brew install iperf3`.
 - Linux: `apt install iperf3` or your distribution's equivalent.
 
@@ -68,24 +68,43 @@ The client scripts run 10 seconds in each direction and print the receiver figur
 
 ### Through switches (normal network)
 
-Plug the Pi into the wall socket or switch; the laptop is on the network as usual. Pass the Pi's DHCP address (from the router's lease list, or `iperf-peer.local`) to the script. Using `169.254.99.1` works only if the laptop also has a direct `169.254` route, which is usually not the case on a routed network.
+Plug the Pi into the wall socket or switch; the laptop is on the network as usual. Run the client script without an argument; it finds the Pi by name or by a network scan (see below). If that fails, pass the Pi's DHCP address from the router's device list.
+
+### How the peer is found
+
+Without an argument, both client scripts try in this order and use the first peer that answers on port 5201 (about 2 s per try):
+
+1. `169.254.99.1` (bare cable; on macOS often also on a normal network, see below).
+2. `iperf-peer.local` (the default hostname set by `setup-raspberry-pi-os.sh`).
+3. `pikvm.local` (the default hostname of a PiKVM).
+4. A scan of the laptop's network, only if it is a `/24` or smaller: a quick ping sweep, then every Raspberry Pi in the ARP table (by its MAC address prefix) is tried on port 5201.
+
+The script prints which peer it uses (`Peer found: ...`). If nothing answers it lists what was tried and exits non-zero. An argument skips all of this.
+
+Limits:
+
+- A renamed Pi or PiKVM is not found by name. Pass its name (`mypi.local`) or its IP, or rely on the scan.
+- Networks that block mDNS (`.local` names) or isolate clients from each other (guest Wi-Fi, some enterprise networks) defeat both the names and the scan. Pass the IP.
+- The scan pings every address in the subnet. Security software on a managed network may notice or flag that.
+- If the peer is also connected by Wi-Fi, the scan may pick its Wi-Fi address and measure the wireless link. Turn the peer's Wi-Fi off, or pass its wired IP.
+- `LANTEST_PEERS="name-or-ip ..."` replaces the list of names tried before the scan.
 
 ### Windows
 
 Double-click `client/lantest.cmd`, or from a command prompt:
 
 ```
-lantest.cmd                  rem bare cable, target 169.254.99.1
-lantest.cmd 192.168.1.50     rem Pi on a normal network
+lantest.cmd                  rem find the peer automatically
+lantest.cmd 192.168.1.50     rem use this peer
 ```
 
-`iperf3.exe` must be in the same folder. The script also lists the laptop's link speeds.
+`iperf3.exe` and `lantest-find.ps1` must be in the same folder; keep the two scripts together. The script also lists the laptop's link speeds.
 
 ### macOS and Linux
 
 ```
-client/lantest.sh                  # target 169.254.99.1
-client/lantest.sh 192.168.1.50     # Pi on a normal network
+client/lantest.sh                  # find the peer automatically
+client/lantest.sh 192.168.1.50     # use this peer
 ```
 
 It shows which interface the target is reached through, warns if that is Wi-Fi, shows the interface's link speed, runs both directions, and prints a one-line verdict. If the Pi is unreachable it exits non-zero with a hint. It works with the bash 3.2 that ships with macOS.

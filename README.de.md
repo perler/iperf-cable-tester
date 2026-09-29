@@ -56,7 +56,7 @@ Das Skript prüft, ob es auf einem PiKVM läuft, schaltet das Root-Dateisystem a
 
 Die Client-Skripte messen je 10 Sekunden in jede Richtung und geben den Empfänger-Wert aus. Vorher iperf3 auf dem Notebook besorgen:
 
-- Windows: ein Build wie https://github.com/ar51an/iperf3-win-builds/releases (entpacken, `client/lantest.cmd` und `client/lantest-find.ps1` in denselben Ordner wie `iperf3.exe` legen).
+- Windows: ein Build wie https://github.com/ar51an/iperf3-win-builds/releases (entpacken, `client/lantest.cmd` und `client/lantest-find.ps1` in denselben Ordner wie `iperf3.exe` legen). Adminrechte sind nicht nötig. Nicht den alten Build 3.1.3 von iperf.fr nehmen: Er legt seine Temp-Datei neben `iperf3.exe` ab und scheitert ohne Adminrechte ("unable to create a new stream"); `lantest.cmd` lehnt ihn ab.
 - macOS: `brew install iperf3`.
 - Linux: `apt install iperf3` bzw. das Äquivalent der Distribution.
 

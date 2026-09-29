@@ -7,6 +7,9 @@ rem        lantest.cmd <peer IP/name>   (use this peer)
 setlocal
 set "TARGET=%~1"
 cd /d "%~dp0"
+rem iperf3 before 3.2 always writes its buffer file next to iperf3.exe (/tmp under Cygwin),
+rem so it fails without admin rights in a protected folder, and it lacks --connect-timeout.
+iperf3.exe -v 2>&1 | findstr /r /b /c:"iperf 3\.[01]\." >nul && goto oldiperf
 set FINDARGS=
 if not "%TARGET%"=="" set FINDARGS=-Target "%TARGET%"
 set "PEER="
@@ -30,6 +33,12 @@ echo.
 echo Reference values (line "receiver"): healthy gigabit = about 850-940 Mbit/s, 100 Mbit/s link = about 94 Mbit/s.
 pause
 exit /b 0
+
+:oldiperf
+echo This iperf3.exe is too old (3.1 or earlier). It needs admin rights and cannot run this test.
+echo Use a current build instead, e.g. https://github.com/ar51an/iperf3-win-builds/releases
+pause
+exit /b 1
 
 :notfound
 pause

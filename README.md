@@ -56,7 +56,7 @@ The script checks that it is running on a PiKVM, switches the root filesystem to
 
 The client scripts run 10 seconds in each direction and print the receiver figure. Get iperf3 for the laptop first:
 
-- Windows: a build such as https://github.com/ar51an/iperf3-win-builds/releases (unzip, put `client/lantest.cmd` and `client/lantest-find.ps1` in the same folder as `iperf3.exe`).
+- Windows: a build such as https://github.com/ar51an/iperf3-win-builds/releases (unzip, put `client/lantest.cmd` and `client/lantest-find.ps1` in the same folder as `iperf3.exe`). No admin rights needed. Avoid the old 3.1.3 build from iperf.fr: it writes its temp file next to `iperf3.exe` and fails without admin rights ("unable to create a new stream"); `lantest.cmd` refuses it.
 - macOS: `brew install iperf3`.
 - Linux: `apt install iperf3` or your distribution's equivalent.
 

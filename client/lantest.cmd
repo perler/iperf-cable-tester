@@ -20,7 +20,7 @@ iperf3.exe -c %TARGET% -t 10 -R --connect-timeout 3000
 if errorlevel 1 goto failed
 
 echo.
-echo Reference values (line "receiver"): healthy gigabit = about 900-940 Mbit/s, 100 Mbit/s link = about 94 Mbit/s.
+echo Reference values (line "receiver"): healthy gigabit = about 850-940 Mbit/s, 100 Mbit/s link = about 94 Mbit/s.
 pause
 exit /b 0
 

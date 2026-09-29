@@ -100,9 +100,9 @@ Maßgeblich ist die Zeile mit `receiver` am Ende jeder Messung.
 
 | # | Ergebnis | Bedeutung |
 |---|----------|-----------|
-| 1 | ca. 900-940 Mbit/s in beide Richtungen | Gigabit-Strecke in Ordnung |
+| 1 | ca. 850-940 Mbit/s in beide Richtungen | Gigabit-Strecke in Ordnung |
 | 2 | ca. 94 Mbit/s, Link zeigt 100 Mbit/s | Strecke linkt nur mit 100 Mbit/s, siehe unten |
-| 3 | Link zeigt 1 Gbit/s, Durchsatz deutlich unter 900 | Störungen auf der Strecke (Übersprechen, schlechte Dose oder Patchung); bei TCP sichtbar an vielen Wiederholungen (`Retr`) |
+| 3 | Link zeigt 1 Gbit/s, Durchsatz deutlich unter 800 | Störungen auf der Strecke (Übersprechen, schlechte Dose oder Patchung); bei TCP sichtbar an vielen Wiederholungen (`Retr`) |
 | 4 | Stark unterschiedlich je Richtung | Meist ein Adernpaar mit Problem oder ein Endgerät am Limit |
 
 Die Link-Geschwindigkeit des Pi: `ethtool eth0 | grep Speed` (beim PiKVM: `cat /sys/class/net/eth0/speed`).

@@ -36,7 +36,8 @@ else
   fi
   # Link speed
   if [ "$OS" = "Darwin" ]; then
-    ifconfig "$DEV" 2>/dev/null | grep media || echo "Link speed: unknown"
+    MEDIA=$(ifconfig "$DEV" 2>/dev/null | sed -n 's/.*media: //p')
+    echo "Link speed: ${MEDIA:-unknown}"
   else
     SPEED=""
     [ -r "/sys/class/net/$DEV/speed" ] && SPEED=$(cat "/sys/class/net/$DEV/speed" 2>/dev/null)
@@ -140,7 +141,7 @@ MIN=$FWD
 
 echo
 echo "Result: $FWD Mbit/s forward, $REV Mbit/s reverse."
-if [ "$MIN" -ge 880 ]; then
+if [ "$MIN" -ge 800 ]; then
   echo "Verdict: OK - the path carries gigabit."
 elif [ "$MIN" -ge 85 ] && [ "$FWD" -le 100 ] && [ "$REV" -le 100 ]; then
   echo "Verdict: the link runs at 100 Mbit/s only (about 94 Mbit/s expected). See README: 'Link only at 100 Mbit/s'."

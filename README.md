@@ -100,9 +100,9 @@ The line to look at is the one ending in `receiver` at the end of each run.
 
 | # | Result | Meaning |
 |---|--------|---------|
-| 1 | about 900-940 Mbit/s in both directions | Gigabit run is fine |
+| 1 | about 850-940 Mbit/s in both directions | Gigabit run is fine |
 | 2 | about 94 Mbit/s, link shows 100 Mbit/s | The run links at 100 Mbit/s only, see below |
-| 3 | Link shows 1 Gbit/s, throughput clearly below 900 | Interference on the run (crosstalk, bad socket or patching); with TCP it shows as many retransmits (`Retr`) |
+| 3 | Link shows 1 Gbit/s, throughput clearly below 800 | Interference on the run (crosstalk, bad socket or patching); with TCP it shows as many retransmits (`Retr`) |
 | 4 | Very different per direction | Usually one wire pair with a problem, or an end device at its limit |
 
 The Pi's own link speed: `ethtool eth0 | grep Speed` (on a PiKVM: `cat /sys/class/net/eth0/speed`).

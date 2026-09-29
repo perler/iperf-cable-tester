@@ -4,6 +4,9 @@
 # LANTEST_PEERS="name-or-ip ..." replaces the list of names tried before the scan.
 # Prints the peer's IPv4 address on stdout (exit 0); messages go to stderr.
 # Exit 1 if nothing was found.
+# With -Target <name>: no search, just print the first of the name's addresses
+# that answers on port 5201 (or the name itself if none does).
+param([string]$Target = '')
 
 $ErrorActionPreference = 'SilentlyContinue'
 $Port = 5201
@@ -24,17 +27,26 @@ function Test-Port([string]$ip) {
     return $false
 }
 
-# First IPv4 address of a name (mDNS for .local on Windows 10/11), at most 2 s.
+# IPv4 addresses of a name (mDNS for .local on Windows 10/11), at most 2 s.
 function Resolve-V4([string]$name) {
     $addr = $null
-    if ([System.Net.IPAddress]::TryParse($name, [ref]$addr)) { return $name }
+    if ([System.Net.IPAddress]::TryParse($name, [ref]$addr)) { return @($name) }
     try {
         $task = [System.Net.Dns]::GetHostAddressesAsync($name)
         if ($task.Wait(2000)) {
-            $v4 = $task.Result | Where-Object { $_.AddressFamily -eq 'InterNetwork' } | Select-Object -First 1
-            if ($v4) { return $v4.IPAddressToString }
+            return @($task.Result | Where-Object { $_.AddressFamily -eq 'InterNetwork' } |
+                ForEach-Object { $_.IPAddressToString } | Select-Object -Unique)
         }
     } catch {}
+    return @()
+}
+
+# First address of a name that answers on port 5201 (a name can have a wired
+# and a Wi-Fi address), or $null.
+function Find-Open([string]$name) {
+    foreach ($ip in (Resolve-V4 $name)) {
+        if (Test-Port $ip) { return $ip }
+    }
     return $null
 }
 
@@ -85,6 +97,12 @@ function Find-ByScan {
     return $null
 }
 
+if ($Target) {
+    $ip = Find-Open $Target
+    if ($ip -and $ip -ne $Target) { Say "Peer: $Target ($ip)"; Write-Output $ip } else { Write-Output $Target }
+    exit 0
+}
+
 if ($env:LANTEST_PEERS) {
     $candidates = $env:LANTEST_PEERS -split '\s+' | Where-Object { $_ }
 } else {
@@ -93,9 +111,8 @@ if ($env:LANTEST_PEERS) {
 
 Say '=== Looking for the peer ==='
 foreach ($c in $candidates) {
-    $ip = Resolve-V4 $c
-    if (-not $ip) { continue }
-    if (Test-Port $ip) {
+    $ip = Find-Open $c
+    if ($ip) {
         if ($ip -eq $c) { Say "Peer found: $c" } else { Say "Peer found: $c ($ip)" }
         Write-Output $ip
         exit 0

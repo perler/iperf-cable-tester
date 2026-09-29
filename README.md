@@ -86,7 +86,7 @@ Limits:
 - A renamed Pi or PiKVM is not found by name. Pass its name (`mypi.local`) or its IP, or rely on the scan.
 - Networks that block mDNS (`.local` names) or isolate clients from each other (guest Wi-Fi, some enterprise networks) defeat both the names and the scan. Pass the IP.
 - The scan pings every address in the subnet. Security software on a managed network may notice or flag that.
-- If the peer is also connected by Wi-Fi, the scan may pick its Wi-Fi address and measure the wireless link. Turn the peer's Wi-Fi off, or pass its wired IP.
+- The iperf3 server listens on the peer's wired port (`eth0`) only, so a peer that is also on Wi-Fi cannot be measured over Wi-Fi by mistake.
 - `LANTEST_PEERS="name-or-ip ..."` replaces the list of names tried before the scan.
 
 ### Windows

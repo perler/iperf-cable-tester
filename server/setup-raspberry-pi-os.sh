@@ -2,7 +2,8 @@
 # Turns a Raspberry Pi 4/5 (Raspberry Pi OS Lite, Bookworm or newer) into an
 # always-on iperf3 peer for cable / throughput tests.
 #
-#   - The iperf3 server starts at every boot (port 5201).
+#   - The iperf3 server starts at every boot (port 5201), bound to eth0, so a
+#     Wi-Fi address never answers and cannot be measured by mistake.
 #   - eth0: DHCP first (20 s). If no address arrives, the fixed address
 #     169.254.99.1/16 is used
 #       -> on a bare cable without a router: reachable at 169.254.99.1
@@ -50,7 +51,7 @@ Description=iperf3 server for LAN cable tests
 After=network.target
 
 [Service]
-ExecStart=/usr/bin/iperf3 --server
+ExecStart=/usr/bin/iperf3 --server --bind-dev eth0
 Restart=always
 RestartSec=2
 DynamicUser=yes

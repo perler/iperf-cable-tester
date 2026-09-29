@@ -86,7 +86,7 @@ Grenzen:
 - Ein umbenannter Pi oder PiKVM wird nicht über den Namen gefunden. Dann seinen Namen (`meinpi.local`) oder seine IP mitgeben, oder auf den Scan setzen.
 - Netze, die mDNS (`.local`-Namen) sperren oder Geräte voneinander abschotten (Gäste-WLAN, manche Firmennetze), verhindern Namen und Scan. Dann die IP mitgeben.
 - Der Scan pingt jede Adresse im Netz an. Sicherheitssoftware in einem verwalteten Netz kann das bemerken oder melden.
-- Hängt die Gegenstelle zusätzlich im WLAN, findet der Scan womöglich deren WLAN-Adresse und misst dann die Funkstrecke. Das WLAN der Gegenstelle abschalten oder ihre kabelgebundene IP mitgeben.
+- Der iperf3-Server lauscht nur am Kabelanschluss der Gegenstelle (`eth0`), deshalb kann eine Gegenstelle, die auch im WLAN hängt, nicht versehentlich über WLAN gemessen werden.
 - `LANTEST_PEERS="name-oder-ip ..."` ersetzt die Liste der Namen, die vor dem Scan probiert werden.
 
 ### Windows

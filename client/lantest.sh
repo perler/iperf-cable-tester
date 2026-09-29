@@ -40,17 +40,26 @@ is_ipv4() {
   echo "$1" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$'
 }
 
-# resolve_v4 <name>: print the first IPv4 address, or nothing (at most ~2 s).
+# resolve_v4 <name>: print its IPv4 addresses, one per line, or nothing (at most ~2 s).
 resolve_v4() {
   if is_ipv4 "$1"; then echo "$1"; return; fi
   : > "$FIND_TMP"
   if [ "$OS" = "Darwin" ]; then
     run_bounded 2 dscacheutil -q host -a name "$1" > "$FIND_TMP" 2>/dev/null
-    awk '/^ip_address:/ {print $2; exit}' "$FIND_TMP"
+    awk '/^ip_address:/ && !seen[$2]++ {print $2}' "$FIND_TMP"
   else
     run_bounded 2 getent ahostsv4 "$1" > "$FIND_TMP" 2>/dev/null
-    awk '{print $1; exit}' "$FIND_TMP"
+    awk '!seen[$1]++ {print $1}' "$FIND_TMP"
   fi
+}
+
+# first_open <name>: print the first of its IPv4 addresses that answers on
+# port 5201 (a name can have a wired and a Wi-Fi address), or nothing.
+first_open() {
+  for a in $(resolve_v4 "$1"); do
+    if port_open "$a"; then echo "$a"; return 0; fi
+  done
+  return 1
 }
 
 # port_open <ip>: TCP connect to port 5201, at most ~2 s.
@@ -139,9 +148,7 @@ find_peer() {
   CANDIDATES=${LANTEST_PEERS:-"169.254.99.1 iperf-peer.local pikvm.local"}
   echo "=== Looking for the peer ==="
   for c in $CANDIDATES; do
-    a=$(resolve_v4 "$c")
-    [ -n "$a" ] || continue
-    if port_open "$a"; then
+    if a=$(first_open "$c"); then
       TARGET=$a
       if [ "$a" = "$c" ]; then echo "Peer found: $c"; else echo "Peer found: $c ($a)"; fi
       return 0
@@ -160,6 +167,10 @@ find_peer() {
 if [ -z "$TARGET" ]; then
   find_peer || { rm -f "$FIND_TMP"; exit 1; }
   echo
+elif ! is_ipv4 "$TARGET" && a=$(first_open "$TARGET"); then
+  # A name: use the address that answers, not whichever iperf3 would pick.
+  echo "Peer: $TARGET ($a)"
+  TARGET=$a
 fi
 rm -f "$FIND_TMP"
 

@@ -7,10 +7,12 @@ rem        lantest.cmd <peer IP/name>   (use this peer)
 setlocal
 set "TARGET=%~1"
 cd /d "%~dp0"
-if not "%TARGET%"=="" goto have_target
-for /f "usebackq delims=" %%A in (`powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0lantest-find.ps1"`) do set "TARGET=%%A"
-if "%TARGET%"=="" goto notfound
-:have_target
+set FINDARGS=
+if not "%TARGET%"=="" set FINDARGS=-Target "%TARGET%"
+set "PEER="
+for /f "usebackq delims=" %%A in (`powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0lantest-find.ps1" %FINDARGS%`) do set "PEER=%%A"
+if "%PEER%"=="" goto notfound
+set "TARGET=%PEER%"
 
 echo.
 echo === Link speed of this computer ===

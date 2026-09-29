@@ -2,7 +2,8 @@
 # Turns a PiKVM (Arch Linux ARM, read-only root, systemd-networkd) into an
 # always-on iperf3 peer for cable / throughput tests.
 #
-#   - installs iperf3 and runs "iperf3 --server" at boot (port 5201)
+#   - installs iperf3 and runs "iperf3 --server" at boot (port 5201), bound to
+#     eth0 so the Wi-Fi address never answers and cannot be measured by mistake
 #   - adds the fixed address 169.254.99.1/16 to eth0 next to whatever DHCP gives
 #   - enables avahi, so the PiKVM answers as <hostname>.local (default pikvm.local)
 #   - never serves DHCP, so it is safe on someone else's network
@@ -44,7 +45,7 @@ Description=iperf3 server for LAN cable tests
 After=network.target
 
 [Service]
-ExecStart=/usr/bin/iperf3 --server
+ExecStart=/usr/bin/iperf3 --server --bind-dev eth0
 Restart=always
 RestartSec=2
 DynamicUser=yes
@@ -52,15 +53,21 @@ DynamicUser=yes
 [Install]
 WantedBy=multi-user.target
 UNITFILE
+unit_changed=0
 if ! cmp -s "$tmp" "$UNIT"; then
   install -m 644 "$tmp" "$UNIT"
   systemctl daemon-reload
+  unit_changed=1
   echo "  wrote $UNIT"
 fi
 rm -f "$tmp"
 # The package's own iperf3.service stays disabled; we use our unit.
 systemctl disable iperf3.service >/dev/null 2>&1 || true
 systemctl enable --now lantester-iperf3.service
+# A running server keeps its old options until restarted.
+if [[ $unit_changed == 1 ]]; then
+  systemctl restart lantester-iperf3.service
+fi
 
 echo "== Fixed address on eth0"
 # A drop-in, so the package's own eth0.network stays untouched.

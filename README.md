@@ -38,6 +38,13 @@ The hostname defaults to `iperf-peer`; change it with `--hostname NAME` or `HOST
 
 After the reboot the Pi answers at `169.254.99.1` on a bare cable, and at its DHCP address or `iperf-peer.local` on a network.
 
+Two optional flags for a Pi that does more than this (for example a subnet router that needs DHCP on every network):
+
+- `--alias-always`: one DHCP profile on `eth0` that carries `169.254.99.1/16` all the time, next to the DHCP address (like the PiKVM variant), instead of the DHCP-then-fallback pair. On a bare cable the fixed address is still there, because the profile stays up when DHCP fails.
+- `--keep-hostname`: leave the hostname alone instead of renaming the Pi to `iperf-peer` (cannot be combined with `--hostname`).
+
+Without the flags nothing changes.
+
 Caveat: NetworkManager ignores carrier loss shorter than about 6 seconds. When you move the Pi from one network to another, unplug the cable for at least 10 seconds or reboot, otherwise it may keep the old address and skip the fallback. With the fallback working, the fixed address is active about 22 seconds after link-up.
 
 ### PiKVM (Arch Linux ARM, read-only root, systemd-networkd)

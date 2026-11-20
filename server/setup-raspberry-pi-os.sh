@@ -12,25 +12,43 @@
 #     someone else's network.
 #
 # Usage on the Pi (once, needs internet):
-#   sudo bash setup-raspberry-pi-os.sh [--hostname NAME]
+#   sudo bash setup-raspberry-pi-os.sh [--hostname NAME | --keep-hostname] [--alias-always]
 # The hostname defaults to "iperf-peer"; HOSTNAME_NEW=name works as well.
+#   --keep-hostname  leave the hostname as it is (a Pi that already has its own name).
+#   --alias-always   one DHCP profile on eth0 that ALSO always carries 169.254.99.1/16
+#                    (DHCP address next to the fixed one, like the PiKVM variant), instead of
+#                    the two profiles above. For a Pi that needs DHCP on every network, e.g. a
+#                    subnet router. No address is handed out to anyone either way.
 set -euo pipefail
 
 FALLBACK_IP="169.254.99.1/16"
 IFACE="eth0"
 NEW_HOSTNAME="${HOSTNAME_NEW:-iperf-peer}"
+KEEP_HOSTNAME=0
+HOSTNAME_GIVEN=0
+[[ -n "${HOSTNAME_NEW:-}" ]] && HOSTNAME_GIVEN=1
+ALIAS_ALWAYS=0
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --hostname)
       [[ $# -ge 2 ]] || { echo "--hostname needs a value." >&2; exit 1; }
-      NEW_HOSTNAME="$2"; shift 2 ;;
+      NEW_HOSTNAME="$2"; HOSTNAME_GIVEN=1; shift 2 ;;
+    --keep-hostname)
+      KEEP_HOSTNAME=1; shift ;;
+    --alias-always)
+      ALIAS_ALWAYS=1; shift ;;
     -h|--help)
-      sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+      sed -n '2,21p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *)
       echo "Unknown argument: $1" >&2; exit 1 ;;
   esac
 done
+
+if [[ $KEEP_HOSTNAME -eq 1 && $HOSTNAME_GIVEN -eq 1 ]]; then
+  echo "--keep-hostname and HOSTNAME_NEW/--hostname exclude each other." >&2
+  exit 1
+fi
 
 if [[ $EUID -ne 0 ]]; then
   echo "Please run with sudo." >&2
@@ -77,23 +95,44 @@ while IFS=: read -r name type; do
   fi
 done < <(nmcli -t -f NAME,TYPE connection show)
 
-if ! nmcli -t -f NAME connection show | grep -qx lan-dhcp; then
-  # First choice: DHCP. If it fails after 20 s the profile counts as failed ...
-  nmcli connection add type ethernet ifname "$IFACE" con-name lan-dhcp \
-    connection.autoconnect yes connection.autoconnect-priority 10 connection.autoconnect-retries 1 \
-    ipv4.method auto ipv4.dhcp-timeout 20 ipv4.may-fail no \
-    ipv6.method auto ipv6.may-fail yes
-fi
-if ! nmcli -t -f NAME connection show | grep -qx lan-direct; then
-  # ... and NetworkManager falls back to the fixed address (bare cable, no router).
-  nmcli connection add type ethernet ifname "$IFACE" con-name lan-direct \
-    connection.autoconnect yes connection.autoconnect-priority 0 \
-    ipv4.method manual ipv4.addresses "$FALLBACK_IP" \
-    ipv6.method link-local
+if [[ $ALIAS_ALWAYS -eq 1 ]]; then
+  # One profile: DHCP, and the fixed address always next to it. The profile stays up when DHCP
+  # fails (may-fail yes), so a bare cable still gets 169.254.99.1.
+  ALIAS_OPTS=(ipv4.method auto ipv4.addresses "$FALLBACK_IP" ipv4.dhcp-timeout 20 ipv4.may-fail yes
+              ipv6.method auto ipv6.may-fail yes
+              connection.autoconnect yes connection.autoconnect-priority 10)
+  if nmcli -t -f NAME connection show | grep -qx lan-dhcp; then
+    nmcli connection modify lan-dhcp "${ALIAS_OPTS[@]}"
+  else
+    nmcli connection add type ethernet ifname "$IFACE" con-name lan-dhcp "${ALIAS_OPTS[@]}"
+  fi
+  # A lan-direct profile from an earlier run without this flag would compete with it.
+  if nmcli -t -f NAME connection show | grep -qx lan-direct; then
+    nmcli connection modify lan-direct connection.autoconnect no
+    echo "  disabled old profile: lan-direct"
+  fi
+else
+  if ! nmcli -t -f NAME connection show | grep -qx lan-dhcp; then
+    # First choice: DHCP. If it fails after 20 s the profile counts as failed ...
+    nmcli connection add type ethernet ifname "$IFACE" con-name lan-dhcp \
+      connection.autoconnect yes connection.autoconnect-priority 10 connection.autoconnect-retries 1 \
+      ipv4.method auto ipv4.dhcp-timeout 20 ipv4.may-fail no \
+      ipv6.method auto ipv6.may-fail yes
+  fi
+  if ! nmcli -t -f NAME connection show | grep -qx lan-direct; then
+    # ... and NetworkManager falls back to the fixed address (bare cable, no router).
+    nmcli connection add type ethernet ifname "$IFACE" con-name lan-direct \
+      connection.autoconnect yes connection.autoconnect-priority 0 \
+      ipv4.method manual ipv4.addresses "$FALLBACK_IP" \
+      ipv6.method link-local
+  fi
 fi
 
 echo "== Hostname"
-if [[ $(hostname) != "$NEW_HOSTNAME" ]]; then
+if [[ $KEEP_HOSTNAME -eq 1 ]]; then
+  NEW_HOSTNAME=$(hostname)
+  echo "  kept: $NEW_HOSTNAME"
+elif [[ $(hostname) != "$NEW_HOSTNAME" ]]; then
   hostnamectl set-hostname "$NEW_HOSTNAME"
   sed -i "s/^127\.0\.1\.1.*/127.0.1.1\t$NEW_HOSTNAME/" /etc/hosts
 fi

@@ -3,6 +3,8 @@
 # /24 for Raspberry Pi devices with port 5201 open.
 # LANTEST_PEERS="name-or-ip ..." replaces the list of names tried before the scan.
 # Prints the peer's IPv4 address on stdout (exit 0); messages go to stderr.
+# For a 169.254.x.x peer reached through a wired adapter, the line is
+# "<peer> <local address>"; lantest.cmd binds iperf3 to that local address.
 # Exit 1 if nothing was found.
 # With -Target <name>: no search, just print the first of the name's addresses
 # that answers on port 5201 (or the name itself if none does).
@@ -15,8 +17,14 @@ $PiOuis = @('b8:27:eb', 'dc:a6:32', 'e4:5f:01', 'd8:3a:dd', '2c:cf:67', '28:cd:c
 function Say($msg) { [Console]::Error.WriteLine($msg) }
 
 # TCP connect to port 5201, at most 2 s (Test-NetConnection is far slower on failure).
-function Test-Port([string]$ip) {
-    $client = New-Object System.Net.Sockets.TcpClient
+# With $local: bound to that local address, so Windows sends through its adapter only.
+function Test-Port([string]$ip, [string]$local = '') {
+    if ($local) {
+        $ep = New-Object System.Net.IPEndPoint([System.Net.IPAddress]::Parse($local), 0)
+        $client = New-Object System.Net.Sockets.TcpClient($ep)
+    } else {
+        $client = New-Object System.Net.Sockets.TcpClient
+    }
     try {
         $ar = $client.BeginConnect($ip, $Port, $null, $null)
         if ($ar.AsyncWaitHandle.WaitOne(2000) -and $client.Connected) { return $true }
@@ -41,13 +49,37 @@ function Resolve-V4([string]$name) {
     return @()
 }
 
+# 169.254.x.x addresses of physical adapters that are up. Tailscale's virtual
+# adapter also takes a 169.254 address when it is not connected, and Windows may
+# then send 169.254.99.1 into it instead of the cable.
+function Get-WiredLinkLocal {
+    $up = @(Get-NetAdapter -Physical | Where-Object Status -eq 'Up' | ForEach-Object { $_.ifIndex })
+    return @(Get-NetIPAddress -AddressFamily IPv4 |
+        Where-Object { $_.IPAddress -like '169.254.*' -and $up -contains $_.InterfaceIndex } |
+        ForEach-Object { $_.IPAddress })
+}
+
 # First address of a name that answers on port 5201 (a name can have a wired
-# and a Wi-Fi address), or $null.
+# and a Wi-Fi address), or $null. A 169.254 peer is tried through each wired
+# link-local address first; then the result is "<peer> <local address>".
 function Find-Open([string]$name) {
     foreach ($ip in (Resolve-V4 $name)) {
+        if ($ip -like '169.254.*') {
+            foreach ($src in (Get-WiredLinkLocal)) {
+                if (Test-Port $ip $src) { return "$ip $src" }
+            }
+        }
         if (Test-Port $ip) { return $ip }
     }
     return $null
+}
+
+# Message for a Find-Open result.
+function Describe([string]$name, [string]$found) {
+    $ip, $src = $found -split ' '
+    $msg = if ($ip -eq $name) { "Peer found: $name" } else { "Peer found: $name ($ip)" }
+    if ($src) { $msg += ", through the cable (this computer: $src)" }
+    return $msg
 }
 
 function Find-ByScan {
@@ -98,8 +130,8 @@ function Find-ByScan {
 }
 
 if ($Target) {
-    $ip = Find-Open $Target
-    if ($ip -and $ip -ne $Target) { Say "Peer: $Target ($ip)"; Write-Output $ip } else { Write-Output $Target }
+    $found = Find-Open $Target
+    if ($found -and $found -ne $Target) { Say (Describe $Target $found); Write-Output $found } else { Write-Output $Target }
     exit 0
 }
 
@@ -111,10 +143,10 @@ if ($env:LANTEST_PEERS) {
 
 Say '=== Looking for the peer ==='
 foreach ($c in $candidates) {
-    $ip = Find-Open $c
-    if ($ip) {
-        if ($ip -eq $c) { Say "Peer found: $c" } else { Say "Peer found: $c ($ip)" }
-        Write-Output $ip
+    $found = Find-Open $c
+    if ($found) {
+        Say (Describe $c $found)
+        Write-Output $found
         exit 0
     }
 }

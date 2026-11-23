@@ -107,6 +107,10 @@ lantest.cmd 192.168.1.50     rem diese Gegenstelle verwenden
 
 `iperf3.exe` und `lantest-find.ps1` müssen im selben Ordner liegen; die beiden Skripte immer zusammen weitergeben. Das Skript zeigt auch die Link-Geschwindigkeiten des Notebooks an.
 
+Vor dem Test fragt es, ob die Ausgabe in eine Logdatei soll; bei J/Y fragt es nach einem Namen und schreibt `<Name>_<Datum>_<Uhrzeit>.txt` neben das Skript.
+
+Eine Gegenstelle unter `169.254.x.x` wird über das Kabel gemessen, auch wenn ein anderer Adapter ebenfalls eine `169.254.x.x`-Adresse hat (der Tailscale-Adapter bekommt eine, wenn Tailscale nicht verbunden ist): Das Skript bindet iperf3 an die Adresse des Kabel-Adapters (`-B`). Adminrechte sind nicht nötig.
+
 ### macOS und Linux
 
 ```

@@ -107,6 +107,10 @@ lantest.cmd 192.168.1.50     rem use this peer
 
 `iperf3.exe` and `lantest-find.ps1` must be in the same folder; keep the two scripts together. The script also lists the laptop's link speeds.
 
+Before the test it asks whether to save the output to a log file; with J/Y it asks for a name and writes `<name>_<date>_<time>.txt` next to the script.
+
+A `169.254.x.x` peer is tested through the cable even when another adapter also has a `169.254.x.x` address (Tailscale's adapter takes one when it is not connected): the script binds iperf3 to the wired adapter's address (`-B`). No admin rights needed.
+
 ### macOS and Linux
 
 ```
